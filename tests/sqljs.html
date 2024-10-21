@@ -1,0 +1,228 @@
+<html>
+
+<head>
+  <title>SQLite Database</title>
+  <style>
+    label {
+      font-weight: bold;
+    }
+
+    #log {
+      border: 1px solid #000;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    pre {
+      border: 1px solid #000;
+      padding: 10px;
+      margin-top: 10px;
+    }
+
+    table {
+      border-collapse: collapse;
+      width: 100%;
+    }
+
+    th,
+    td {
+      border: 1px solid black;
+      padding: 8px;
+      text-align: left;
+    }
+
+    textarea {
+      width: 100%;
+    }
+  </style>
+  <script>
+    function Debug(message) {
+      console.log(message);
+      document.getElementById('log').innerHTML += message + '<br>';
+    }
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+
+</head>
+
+<body>
+  <h1>Create, Query, Download SQLite database</h1>
+
+  <form id="UploadDatabase" onsubmit="return false; ">
+    <fieldset>
+      <label for="file">Upload Database:</label><br>
+      <input type="file" id="file" name="file" accept=".db"><br /><br />
+
+      <input type="submit" value="Upload">
+    </fieldset>
+  </form>
+
+  <label for="RunSQL">Run Query:</label><br>
+  <form id="RunSQL" onsubmit="return false; ">
+    <fieldset>
+      <label for="userSQL">SQL:</label><br>
+      <textarea id="userSQL" name="userSQL" rows="10">
+create table passwords(id, name, username, password);
+insert into passwords values
+(1, 'Google', 'admin', '447Witty-Pink-Flamingo'),
+(2, 'Slack', 'admin', '332#Funny-Green-Spider'),
+(3, 'Twitter', 'admin', '562.Beautiful-Magenta-Dove');
+select * from passwords;
+      </textarea><br /><br />
+
+      <input type="submit" value="Run Query">
+    </fieldset>
+  </form>
+
+  <label for="output">Output:</label><br>
+  <pre id="output"></pre>
+
+  <form id="DownloadDatabase" onsubmit="return false; ">
+    <input type="submit" value="Download Database">
+  </form>
+
+  <hr />
+  <label for="log">Log:</label><br>
+  <div id="log"></div>
+
+  <script src="https://unpkg.com/@antonz/sqlean/dist/sqlean.js"></script>
+  <script>
+
+    // UI functions
+    // Result: [{"columns":["id","name","username","password"],"values":[[1,"Google","admin","447Witty-Pink-Flamingo"],[2,"Slack","admin","332#Funny-Green-Spider"],[3,"Twitter","admin","562.Beautiful-Magenta-Dove"]]}]
+    function printSQLTable(result) {
+      // If the result is empty, do nothing
+      if (result.length === 0) {
+        return;
+      }
+
+      const output = document.getElementById('output');
+      output.innerHTML = '';
+      const table = document.createElement('table');
+      const thead = document.createElement('thead');
+      const tbody = document.createElement('tbody');
+      const tr = document.createElement('tr');
+
+      // Create the header
+      for (const column of result[0].columns) {
+        const th = document.createElement('th');
+        th.appendChild(document.createTextNode(column));
+        tr.appendChild(th);
+      }
+      thead.appendChild(tr);
+      table.appendChild(thead);
+
+      // Create the rows
+      for (const row of result[0].values) {
+        const tr = document.createElement('tr');
+        for (const value of row) {
+          const td = document.createElement('td');
+          td.appendChild(document.createTextNode(value));
+          tr.appendChild(td);
+        }
+        tbody.appendChild(tr);
+      }
+
+      table.appendChild(tbody);
+      output.appendChild(table);
+    }
+
+    // SQLite initialization
+    // ---------------------
+    let SQL = null;
+    let db = null;
+
+    async function StartUp() {
+      // Create a new SQL.js instance
+      SQL = await initSqlJs({
+        locateFile: file => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/${file}`
+      });
+      Debug("SQLite initialized");
+
+      // Create a new in-memory database
+      db = new SQL.Database();
+    }
+    StartUp();
+
+    // UI event handlers
+    // -----------------
+
+    document.querySelector('#RunSQL input[type="submit"]').addEventListener('click', async () => {
+
+      const userSQL = document.getElementById('userSQL').value;
+      Debug("Running SQL: " + userSQL);
+
+      if (!db) {
+        Debug("SQLite not initialized");
+        return;
+      }
+
+      try {
+        const result = db.exec(userSQL);
+        Debug("Result: " + JSON.stringify(result));
+
+        if (result.length > 0) {
+          printSQLTable(result);
+        }
+      } catch (error) {
+        Debug('Error: ' + error);
+      }
+    });
+
+    document.querySelector('#DownloadDatabase input[type="submit"]').addEventListener('click', async () => {
+      Debug("Downloading database");
+
+       if (!db) {
+        Debug("SQLite not initialized");
+        return;
+      }
+
+      // Get the database file
+      const data = db.export();
+      const buffer = new Uint8Array(data);
+      const blob = new Blob([buffer], {
+        type: 'application/octet-stream'
+      });
+
+      // Create a download link
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = 'database.db';
+
+      // Trigger the download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    });
+
+
+    document.querySelector('#UploadDatabase input[type="submit"]').addEventListener('click', async () => {
+
+      Debug("Uploading database");
+
+
+      const file = document.getElementById('file').files[0];
+      if (!file) {
+        Debug('No file selected');
+        return;
+      }
+
+      Debug("File selected: " + file.name);
+
+      const reader = new FileReader();
+      reader.onload = function (event) {
+        const buffer = event.target.result;
+        const uInt8Array = new Uint8Array(buffer);
+        db = new SQL.Database(uInt8Array);
+        Debug("Database uploaded");
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+
+
+  </script>
+</body>
+
+</html>

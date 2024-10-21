@@ -1,0 +1,101 @@
+<!-- HTML5 boiler plate -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Title</title>
+  <link rel="stylesheet" href="style.css">
+
+  <!-- Load from CDN during prototype. ToDo: embed in html-->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.6.2/sql-wasm.js"></script>
+
+  <script src="app.js" defer></script>
+</head>
+
+<body>
+
+  <div id="Banner-Beta">
+    <p>Beta - This is a proof of concept. Do not use for anything you care about</p>
+  </div>
+
+  <h1>Fancy-Maroon-Gorilla - Password Database</h1>
+  <p>In memory Password Database.</p>
+
+  <section id="Sources">
+    <h2>1. Source</h2>
+    <p>Select where the password database comes from</p>
+    <div>
+      <!-- When the user clicks "login" show a alert box telling them that its not implmented yet -->
+      <a href="#" onclick="return alert('Not implmented')">Login</a>
+    </div>
+    <div> <a href="#" onclick="return UploadDatabase()">Upload From Computer</a></div>
+    <div> <a href="#" onclick="return CreateDatabase()">Create new Database</a></div>
+  </section>
+
+  <section id="Search">
+    <h2>2. Search</h2>
+    <p>Search the database for passwords</p>
+
+    <!-- Search the database, on update of the search box. No submit button -->
+    <form id="SearchForm">
+      <label for="SearchBox">Search:</label>
+      <input type="text" id="SearchBox" placeholder="Search for a password" oninput="SearchDatabase()">
+    </form>
+
+    <label for="SearchResults">Search Results:</label>
+    <div id="SearchResults">
+      <!-- Search results will be displayed here -->
+    </div>
+  </section>
+
+  <section id="Edit"></section>
+
+  <section id="Add">
+    <h2>4. Add New Password</h2>
+    <p>Add a password to the database</p>
+
+    <form id="AddForm" onsubmit="AddNewPassword(); return false;">
+      <label for="AddLabel">Label:</label>
+      <input type="text" id="AddLabel" placeholder="Label of the password" required>
+
+      <label for="AddUsername">Username:</label>
+      <input type="text" id="AddUsername" placeholder="Name of the password" required>
+
+      <label for="AddPassword">Password:</label>
+      <input type="text" id="AddPassword" placeholder="Password" required>
+
+      <label for="AddNotes">Notes:</label>
+      <textarea id="AddNotes" placeholder="Notes about the password"></textarea>
+
+      <br />
+      <input type="submit" value="Add Password">
+    </form>
+  </section>
+
+  <section id="Save">
+    <h2>4. Save Database</h2>
+    <p>If you change the database you will need to save the changes</p>
+
+    <div>
+      <a href="#" onclick="return alert('Not implmented')">Save to Cloud</a>
+    </div>
+    <div>
+      <a href="#" onclick="return DownloadDatabase()">Download Database</a>
+    </div>
+  </section>
+
+  <section id="Log">
+    <h2>Log</h2>
+
+    <div id="LogResults">
+    </div>
+  </section>
+
+  <footer>
+    Prototype 2024-Oct-21
+  </footer>
+</body>
+
+</html>
