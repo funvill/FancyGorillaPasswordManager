@@ -69,5 +69,7 @@ section {
 }
 
 label {
-    display: block;    
+    display: block;
+    font-weight: bold;
+    font-size: larger;
 }

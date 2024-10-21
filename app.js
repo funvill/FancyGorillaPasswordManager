@@ -1,8 +1,15 @@
+// Start the web server with HTTPs
+// 
+// openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -keyout key.pem -out cert.pem
+// http-server -S
+
 // SQLite initialization
 // ---------------------
 let SQL = null;
 let db = null;
 const DBPassword = 'password';
+const DB_EXTENSION = '.password_db';
+// const DB_EXTENSION = '.sqlite';
 
 // Helpers
 // ---------------------
@@ -18,10 +25,6 @@ if (!crypto || !crypto.subtle) {
 } else {
   Debug("Web Crypto API is available");
 }
-
-
-
-
 
 async function StartUp() {
   // Create a new SQL.js instance
@@ -137,7 +140,7 @@ function UploadDatabase() {
   // Trigger file picker so the user can select a file. Then read the file and load it into the database
   const fileInput = document.createElement('input');
   fileInput.type = 'file';
-  fileInput.accept = '.password_db';
+  fileInput.accept = DB_EXTENSION;
 
   fileInput.onchange = async () => {
     const file = fileInput.files[0];
@@ -148,21 +151,22 @@ function UploadDatabase() {
     Debug("File selected: " + file.name);
 
     const reader = new FileReader();
-    reader.onload = function (event) {
+    reader.onload = async function (event) {
       Debug("Database uploaded...");
 
       const buffer = event.target.result;
       const uInt8Array = new Uint8Array(buffer);
 
       // Decrypt the database
-      decryptDataWithPassword(DBPassword, uInt8Array).then((decryptedBlob) => {
-        Debug("Database decrypted...");
+      let decryptedBlob = await decryptDataWithPassword(DBPassword, uInt8Array);
+      Debug("Database decrypted...");
 
-        db = new SQL.Database(decryptedBlob);
+      const decryptedUint8Array = new Uint8Array(decryptedBlob);
+      db = new SQL.Database(decryptedUint8Array);
 
-        Debug("Database loaded");
-        SearchDatabase();
-      });
+      Debug("Database loaded");
+      SearchDatabase();
+
     };
     reader.readAsArrayBuffer(file);
   };
@@ -170,7 +174,7 @@ function UploadDatabase() {
   fileInput.click();
 }
 
-function DownloadDatabase() {
+async function DownloadDatabase() {
   Debug("Downloading database");
 
   if (!db) {
@@ -183,20 +187,17 @@ function DownloadDatabase() {
   const buffer = new Uint8Array(data);
 
   // Encrypt the database  
-  encryptDataWithPassword(DBPassword, buffer).then((encryptedBlob) => {
-    // Create a download link
-    const link = document.createElement('a');
-    const blob = new Blob([encryptedBlob], {
-      type: 'application/octet-stream'
-    });
-    link.href = URL.createObjectURL(blob);
-    link.download = 'database.password_db';
+  let encryptedBlob = await encryptDataWithPassword(DBPassword, buffer);
 
-    // Trigger the download
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  });
+  // Create a download link
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([encryptedBlob]));
+  link.download = 'database' + DB_EXTENSION;
+
+  // Trigger the download
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
 function AddNewPassword() {
@@ -391,90 +392,104 @@ function SearchDatabase() {
   }
 }
 
-// Hardcoded constants
-const ITERATIONS = 100000;
-const SALT_LENGTH = 16; // 16 bytes salt
-const IV_LENGTH = 12;   // 12 bytes IV (recommended for AES-GCM)
-const KEY_LENGTH = 256; // AES-GCM 256-bit key length
-
 // Encryption functions 
 // --------------------
 
+// Constants
+const SALT_LENGTH = 16; // Length of the salt (in bytes)
+const IV_LENGTH = 12;   // Length of the initialization vector (in bytes)
+const PBKDF2_ITERATIONS = 100000; // Number of PBKDF2 iterations
+const KEY_LENGTH = 256; // Length of the AES-GCM key (in bits)
+const HASH_ALGORITHM = "SHA-256"; // Hash algorithm for PBKDF2
 
+async function encryptDataWithPassword(password, decryptedArrayBuffer) {
+  const encoder = new TextEncoder();
 
-// Encrypt a text using the password, automatically generating salt and IV
-async function encryptDataWithPassword(password, decrypted_uInt8Array) {
-
-  return decrypted_uInt8Array;
-
-  // Generate a random salt
+  // Generate a random salt and initialization vector (IV)
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-
-  // Derive a key from the password
-  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {
-    name: 'PBKDF2'
-  }, false, ['deriveBits', 'deriveKey']);
-
-  const key = await crypto.subtle.deriveKey({
-    name: 'PBKDF2',
-    salt: salt,
-    iterations: ITERATIONS,
-    hash: 'SHA-256'
-  }, keyMaterial, {
-    name: 'AES-GCM',
-    length: KEY_LENGTH
-  }, true, ['encrypt']);
-
-  // Generate a random IV
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
 
+  // Derive a key from the password using PBKDF2
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password), // Encode the password
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
+
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: PBKDF2_ITERATIONS, // Use the constant for iterations
+      hash: HASH_ALGORITHM, // Use the constant for the hash algorithm
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: KEY_LENGTH }, // Use the constant for key length
+    true,
+    ["encrypt"]
+  );
+
   // Encrypt the data
-  const encrypted = await crypto.subtle.encrypt({
-    name: 'AES-GCM',
-    iv: iv
-  }, key, decrypted_uInt8Array);
+  const encryptedData = await crypto.subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv: iv, // Use the generated IV
+    },
+    key,
+    decryptedArrayBuffer // The data to encrypt, must be an ArrayBuffer
+  );
 
-  // Combine the salt, IV and the encrypted data
-  const result = new Uint8Array(salt.byteLength + iv.byteLength + encrypted.byteLength);
-  result.set(salt, 0);
-  result.set(iv, salt.byteLength);
-  result.set(new Uint8Array(encrypted), salt.byteLength + iv.byteLength);
+  // Concatenate salt, IV, and encrypted data into one buffer for easy storage
+  const encryptedArrayBuffer = new Uint8Array(salt.length + iv.length + encryptedData.byteLength);
+  encryptedArrayBuffer.set(salt, 0); // Add the salt at the beginning
+  encryptedArrayBuffer.set(iv, salt.length); // Add the IV after the salt
+  encryptedArrayBuffer.set(new Uint8Array(encryptedData), salt.length + iv.length); // Add encrypted data
 
-  return result;
+  return encryptedArrayBuffer; // Return the full encrypted data (including salt and IV)
 
 }
+async function decryptDataWithPassword(password, encryptedArrayBuffer) {
+  const encoder = new TextEncoder();
 
-// Decrypt the data using the password
-async function decryptDataWithPassword(password, encrypted_uInt8Array) {
+  // Extract the salt, IV, and encrypted data from the buffer
+  const salt = encryptedArrayBuffer.slice(0, SALT_LENGTH);
+  const iv = encryptedArrayBuffer.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
+  const encryptedData = encryptedArrayBuffer.slice(SALT_LENGTH + IV_LENGTH);
 
-  return encrypted_uInt8Array;
+  // Derive the key using PBKDF2 (same process as encryption)
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(password), // Encode the password
+    { name: "PBKDF2" },
+    false,
+    ["deriveKey"]
+  );
 
-  // Get the salt, IV and the encrypted data
-  const salt = encrypted_uInt8Array.slice(0, SALT_LENGTH);
-  const iv = encrypted_uInt8Array.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
-  const encrypted = encrypted_uInt8Array.slice(SALT_LENGTH + IV_LENGTH);
-
-  // Derive the key
-  const keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), {
-    name: 'PBKDF2'
-  }, false, ['deriveBits', 'deriveKey']);
-
-  const key = await crypto.subtle.deriveKey({
-    name: 'PBKDF2',
-    salt: salt,
-    iterations: ITERATIONS,
-    hash: 'SHA-256'
-  }, keyMaterial, {
-    name: 'AES-GCM',
-    length: KEY_LENGTH
-  }, true, ['decrypt']);
+  const key = await crypto.subtle.deriveKey(
+    {
+      name: "PBKDF2",
+      salt: salt,
+      iterations: PBKDF2_ITERATIONS, // Use the constant for iterations
+      hash: HASH_ALGORITHM, // Use the constant for the hash algorithm
+    },
+    keyMaterial,
+    { name: "AES-GCM", length: KEY_LENGTH }, // Use the constant for key length
+    true,
+    ["decrypt"]
+  );
 
   // Decrypt the data
-  const decrypted = await crypto.subtle.decrypt({
-    name: 'AES-GCM',
-    iv: iv
-  }, key, encrypted);
+  const decryptedData = await crypto.subtle.decrypt(
+    {
+      name: "AES-GCM",
+      iv: iv, // Use the IV from the encrypted buffer
+    },
+    key,
+    encryptedData // Encrypted data (extracted from buffer)
+  );
 
-  return decrypted;
-
+  return decryptedData; // Return the decrypted data (ArrayBuffer)
 }
+
