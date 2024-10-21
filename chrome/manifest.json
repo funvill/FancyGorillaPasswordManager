@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Fancy-Gorilla - Password Database",
+  "description": "Offline password database",
+  "version": "1.0",
+  "permissions": ["activeTab"],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+
+  "action": {
+    "default_popup": "hello.html",
+    "default_icon": "hello_extensions.png"
+  },
+  "background": {
+    "service_worker": "scripts/background.js"
+  }  
+}
