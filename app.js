@@ -7,7 +7,7 @@
 // ---------------------
 let SQL = null;
 let db = null;
-const DBPassword = 'password';
+// const DBPassword = 'password';
 const DB_EXTENSION = '.password_db';
 // const DB_EXTENSION = '.sqlite';
 
@@ -150,6 +150,10 @@ function UploadDatabase() {
     }
     Debug("File selected: " + file.name);
 
+    // Get the database password 
+    let DBPassword = prompt("Enter the database password");
+    Debug("Database password: " + DBPassword);
+
     const reader = new FileReader();
     reader.onload = async function (event) {
       Debug("Database uploaded...");
@@ -157,12 +161,18 @@ function UploadDatabase() {
       const buffer = event.target.result;
       const uInt8Array = new Uint8Array(buffer);
 
-      // Decrypt the database
-      let decryptedBlob = await decryptDataWithPassword(DBPassword, uInt8Array);
-      Debug("Database decrypted...");
+      try {
+        // Decrypt the database
+        let decryptedBlob = await decryptDataWithPassword(DBPassword, uInt8Array);
+        Debug("Database decrypted...");
 
-      const decryptedUint8Array = new Uint8Array(decryptedBlob);
-      db = new SQL.Database(decryptedUint8Array);
+        const decryptedUint8Array = new Uint8Array(decryptedBlob);
+        db = new SQL.Database(decryptedUint8Array);
+
+      } catch (error) {
+        alert("Error decrypting database: " + error);
+        return;
+      }
 
       Debug("Database loaded");
       SearchDatabase();
@@ -181,6 +191,9 @@ async function DownloadDatabase() {
     Debug("SQLite not initialized");
     return;
   }
+
+  let DBPassword = prompt("Enter the database password");
+  Debug("Database password: " + DBPassword);
 
   // Get the database file
   const data = db.export();
